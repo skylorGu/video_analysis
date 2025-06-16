@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频集锦生成 - 智能分析平台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .header-section {
+            background: linear-gradient(135deg, rgba(139, 69, 255, 0.3), rgba(59, 130, 246, 0.3));
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .header-section h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: white !important;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            margin-bottom: 0.5rem;
+            z-index: 10;
+            position: relative;
+        }
+        .header-section p {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.9) !important;
+            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+            margin-bottom: 1.5rem;
+            font-weight: 400;
+            z-index: 10;
+            position: relative;
+        }
+        
+        /* 导航菜单样式 */
+        .nav-menu {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+        }
+        .nav-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        .nav-btn:hover::before {
+            left: 100%;
+        }
+        .nav-btn:hover {
+            color: white;
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+        .nav-btn.active {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            border-color: #ff6b6b;
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+        }
+        .nav-btn.active:hover {
+            background: linear-gradient(135deg, #ff5252 0%, #d84315 100%);
+            box-shadow: 0 12px 35px rgba(255, 107, 107, 0.4);
+        }
+        
+        .floating-element {
+            position: absolute;
+            opacity: 0.1;
+            animation: float 6s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .highlights-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .highlights-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        .highlights-card .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            border: none;
+        }
+        .highlights-card .card-header h5 {
+            color: white !important;
+            font-weight: 600;
+        }
+        .highlights-card .card-header i {
+            color: white !important;
+        }
+        
+        .timeline-item {
+            background: rgba(102, 126, 234, 0.1);
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 0 10px 10px 0;
+            transition: all 0.3s ease;
+        }
+        .timeline-item:hover {
+            background: rgba(102, 126, 234, 0.2);
+            transform: translateX(5px);
+        }
+        
+        .generate-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 25px;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+        }
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        
+        .progress-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .highlight-preview {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="result-page">
+    <!-- 浮动装饰元素 -->
+    <div class="floating-element" style="top: 10%; left: 5%;">
+        <i class="bi bi-collection-play" style="font-size: 3rem; color: white;"></i>
+    </div>
+    <div class="floating-element" style="top: 20%; right: 10%; animation-delay: -2s;">
+        <i class="bi bi-film" style="font-size: 2.5rem; color: white;"></i>
+    </div>
+
+    <div class="floating-element" style="bottom: 15%; right: 5%; animation-delay: -1s;">
+        <i class="bi bi-magic" style="font-size: 2.5rem; color: white;"></i>
+    </div>
+
+    <div class="container-fluid">
+        <!-- 头部 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="header-section text-center">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="1.5" class="me-3" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3)); z-index: 10; position: relative;">
+                        <path d="M23 7l-7 5 7 5V7z"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    <h1 class="d-inline-block">视频集锦生成</h1>
+                    <p>基于AI智能分析，自动识别视频精彩片段并生成个性化集锦</p>
+                    
+                    <!-- 导航菜单 -->
+                    <div class="nav-menu mt-4">
+                        <a href="/" class="nav-btn">
+                            <i class="bi bi-house me-2"></i>返回上传页面
+                        </a>
+                        <a href="#" class="nav-btn active">
+                            <i class="bi bi-collection-play me-2"></i>视频集锦生成
+                        </a>
+                        <a href="/result" class="nav-btn">
+                            <i class="bi bi-file-text me-2"></i>分析结果
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 集锦生成区域 -->
+        <div class="row justify-content-center">
+            <!-- 视频预览和生成控制 -->
+            <div class="col-lg-8 mb-4">
+                <div class="highlights-card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>原视频预览</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <video id="original-video" controls class="w-100 mb-4" style="max-height: 400px; border-radius: 15px;">
+                            <source src="{{ video_url if video_url else '/static/uploads/sample.mp4' }}" type="video/mp4">
+                            您的浏览器不支持视频播放。
+                        </video>
+                        
+                        <button class="generate-btn" id="generate-highlights-btn" style="padding: 15px 40px; font-size: 1.2rem;">
+                            <i class="bi bi-magic me-2"></i>生成集锦
+                        </button>
+                        
+                        <!-- 生成进度显示 -->
+                        <div id="generation-progress" class="mt-4" style="display: none;">
+                            <div class="text-center mb-3">
+                                <i class="bi bi-gear-fill" style="font-size: 2rem; color: #667eea; animation: spin 2s linear infinite;"></i>
+                                <h5 class="mt-2">正在生成视频集锦...</h5>
+                            </div>
+                        </div>
+                        
+                        <!-- 生成结果显示 -->
+                        <div id="generation-result" class="mt-4" style="display: none;">
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle me-2"></i>
+                                集锦视频生成成功！
+                            </div>
+                            <video id="highlight-video" controls class="w-100" style="max-height: 300px; border-radius: 15px;">
+                                您的浏览器不支持视频播放。
+                            </video>
+                            <div class="mt-3">
+                                <a id="download-link" class="btn btn-success" href="#" download>
+                                    <i class="bi bi-download me-2"></i>下载集锦视频
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                                  
+                        
+                        <div class="text-center mt-4">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                点击播放按钮预览片段，生成集锦后可下载完整版本
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 生成进度区域 -->
+        <div class="progress-section d-none" id="generation-progress">
+            <div class="text-center mb-4">
+                <i class="bi bi-gear-fill" style="font-size: 3rem; color: #667eea; animation: spin 2s linear infinite;"></i>
+                <h4 class="mt-3">正在生成视频集锦...</h4>
+                <p class="text-muted">AI正在分析和剪辑您的视频，请稍候</p>
+            </div>
+            
+            <div class="progress mb-3" style="height: 10px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" style="width: 0%" id="generation-progress-bar"></div>
+            </div>
+            
+            <div class="text-center">
+                <span id="generation-status">初始化生成引擎...</span>
+            </div>
+        </div>
+        
+        <!-- 生成结果区域 -->
+        <div class="row d-none" id="generation-result">
+            <div class="col-12">
+                <div class="highlights-card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>集锦生成完成</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <video id="generated-highlights" controls class="w-100" style="max-height: 400px; border-radius: 15px;">
+                                    <source src="" type="video/mp4">
+                                    您的浏览器不支持视频播放。
+                                </video>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>集锦信息</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>总时长：</strong><span id="highlight-total-duration">1分30秒</span></li>
+                                    <li><strong>片段数量：</strong><span id="highlight-segments-count">3个</span></li>
+                                    <li><strong>生成时间：</strong><span id="highlight-generation-time">2分15秒</span></li>
+                                    <li><strong>文件大小：</strong><span id="highlight-file-size">15.2MB</span></li>
+                                </ul>
+                                
+                                <div class="d-grid gap-2 mt-4">
+                                    <button class="btn btn-primary" id="download-highlights-btn">
+                                        <i class="bi bi-download me-2"></i>下载集锦视频
+                                    </button>
+                                    <button class="btn btn-outline-secondary" id="regenerate-btn">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>重新生成
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // 预览片段功能
+        function previewSegment(startTime, endTime) {
+            const video = document.getElementById('original-video');
+            video.currentTime = startTime;
+            video.play();
+            
+            // 在指定时间停止
+            setTimeout(() => {
+                video.pause();
+            }, (endTime - startTime) * 1000);
+        }
+        
+        // 生成集锦功能
+        document.getElementById('generate-highlights-btn').addEventListener('click', function() {
+            const button = this;
+            const progressSection = document.getElementById('generation-progress');
+            const resultSection = document.getElementById('generation-result');
+            const highlightVideo = document.getElementById('highlight-video');
+            const downloadLink = document.getElementById('download-link');
+            
+            // 禁用按钮并显示进度
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>生成中...';
+            progressSection.style.display = 'block';
+            resultSection.style.display = 'none';
+            
+            // 调用后端API生成集锦
+            fetch('/generate_highlights', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 延时1秒后显示结果
+                    setTimeout(() => {
+                        // 隐藏进度，显示结果
+                        progressSection.style.display = 'none';
+                        resultSection.style.display = 'block';
+                        
+                        // 设置集锦视频源
+                        highlightVideo.src = data.highlight_url;
+                        downloadLink.href = data.highlight_url;
+                        downloadLink.download = data.highlight_filename;
+                        
+                        // 恢复按钮
+                        button.disabled = false;
+                        button.innerHTML = '<i class="bi bi-magic me-2"></i>生成集锦';
+                    }, 1000);
+                } else {
+                    throw new Error(data.error || '集锦生成失败');
+                }
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                console.error('生成集锦时发生错误:', error);
+                
+                // 隐藏进度
+                progressSection.style.display = 'none';
+                
+                // 显示错误信息
+                alert('集锦生成失败: ' + error.message);
+                
+                // 恢复按钮
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-magic me-2"></i>生成集锦';
+            });
+        });
+        
+        // 下载功能已集成到新界面中
+        // 重新生成功能：点击生成集锦按钮即可重新生成
+        
+        // 旋转动画
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

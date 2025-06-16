@@ -1,0 +1,9 @@
+flask
+flask-cors
+python-dotenv
+requests
+werkzeug
+numpy
+pillow
+xmindparser
+xmind-sdk
